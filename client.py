@@ -18,16 +18,16 @@ def get_system_data():
     print("INFO: getting system data")
     data = {}
     data.update({"server": platform.uname()[1]})
-    data.update({"datetime": datetime.datetime.now()})
+    data.update({"datetime": datetime.datetime.utcnow()})
     data.update({"os": platform.uname()[2]})
     data.update({"uptime": datetime.datetime.fromtimestamp(psutil.boot_time())})
-    data.update({"cpu_prc": psutil.cpu_percent(interval=1)})
-    data.update({"mem_prc": 100 - psutil.virtual_memory()[2]})
-    data.update({"disc_prc": psutil.disk_usage('/')[3]})
+    data.update({"cpu_prc": round(psutil.cpu_percent(interval=1), 2)})
+    data.update({"mem_prc": round(100 - psutil.virtual_memory()[2], 2)})
+    data.update({"disc_prc": round(psutil.disk_usage('/')[3], 2)})
     data.update({"net_in": psutil.net_io_counters()[1]})
     data.update({"net_out": psutil.net_io_counters()[0]})
 
-    sensors = ("bcm2835_thermal", "acpitz", "cpu-thermal")
+    sensors = ("bcm2835_thermal", "acpitz", "cpu-thermal", "radeon")
     data.update({"temp": 0})
     for sensor in sensors:
         try: data.update({"temp": psutil.sensors_temperatures()[sensor][0][1]})
