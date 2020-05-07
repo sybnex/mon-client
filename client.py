@@ -26,7 +26,12 @@ def get_system_data():
     data.update({"disc_prc": psutil.disk_usage('/')[3]})
     data.update({"net_in": psutil.net_io_counters()[1]})
     data.update({"net_out": psutil.net_io_counters()[0]})
-    data.update({"temp": psutil.sensors_temperatures()["acpitz"][0][1]})
+
+    try: data.update({"temp": psutil.sensors_temperatures()["acpitz"][0][1]})
+    except: data.update({"temp": 0})
+    try: data.update({"temp": psutil.sensors_temperatures()["cpu-thermal"][0][1]})
+    except: data.update({"temp": 0})
+
     try:
         load = psutil.getloadavg()
     except Exception:
