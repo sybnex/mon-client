@@ -27,10 +27,12 @@ def get_system_data():
     data.update({"net_in": psutil.net_io_counters()[1]})
     data.update({"net_out": psutil.net_io_counters()[0]})
 
-    try: data.update({"temp": psutil.sensors_temperatures()["acpitz"][0][1]})
-    except: data.update({"temp": 0})
-    try: data.update({"temp": psutil.sensors_temperatures()["cpu-thermal"][0][1]})
-    except: data.update({"temp": 0})
+    sensors = ("bcm2835_thermal", "acpitz", "cpu-thermal")
+    data.update({"temp": 0})
+    for sensor in sensors:
+        try: data.update({"temp": psutil.sensors_temperatures()[sensor][0][1]})
+        except: continue
+        else: break
 
     try:
         load = psutil.getloadavg()
