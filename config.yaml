@@ -1,0 +1,9 @@
+---
+monitor:
+  - system: True
+    kube: False
+
+elastic:
+  - url: "https://elasticsearch:9200"
+    user: ""
+    pass: ""
