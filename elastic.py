@@ -3,6 +3,7 @@
 
 import os
 import sys
+import datetime
 
 class elastic():
 
@@ -10,6 +11,8 @@ class elastic():
         self.url = url
         self.username = username
         self.password = password
+        self.suffix = ""
+        self.index = "system"
         self.es = None
         try:
             from elasticsearch import Elasticsearch
@@ -17,12 +20,44 @@ class elastic():
                       http_auth=(self.username, self.password),
                       scheme="https", port=443)
         except Exception as x:
-            print("ERROR: could not connect to database: %s", x)
+            print("ERROR: could not connect to database:", x)
         else:
-            self.create_system_index()
+            self.create_template()
+            self.check_index()
 
 
-    def create_system_index(self):
+    def check_index(self):
+        # needed for long termn runs
+        if not self.suffix == self.create_suffix():
+            self.suffix = self.create_suffix()
+            self.create_index()
+
+
+    def create_suffix(self):
+        # create daily index
+        now = datetime.datetime.utcnow()
+        year = str(now.year)[2:]
+        month = str(now.month).zfill(2)
+        day = str(now.day).zfill(2)
+        return "-%s%s%s" % (year, month, day)
+
+
+    def create_template(self):
+        body = {
+            "zeroreplicas" : {
+                "order" : 1,
+                "template" : "*",
+                "settings" : {
+                    "index" : { "number_of_replicas" : "0" }
+                },
+                "mappings" : { },
+                "aliases" : { }
+            }
+        }
+        self.es.indices.put_template(name="default", body=body)
+
+
+    def create_index(self):
         settings = {
             "settings": {
                 "number_of_shards": 1,
@@ -44,14 +79,27 @@ class elastic():
                     "load5": {"type": "float"},
                     "load15": {"type": "float"},
                     "work": {"type": "bool"},
+                    "dck_version": {"type": "text"},
+                    "dck_containers": {"type": "integer"},
+                    "dck_images": {"type": "integer"},
+                    "k8s_name": {"type": "text"},
+                    "k8s_version": {"type": "text"},
+                    "k8s_cpu": {"type": "integer"},
+                    "k8s_memory": {"type": "integer"},
+                    "k8s_nodes": {"type": "integer"},
+                    "k8s_pods": {"type": "integer"},
+                    "k8s_pvcs": {"type": "integer"},
+                    "k8s_secrets": {"type": "integer"},
+                    "k8s_services": {"type": "integer"},
                 }
             }
         }
-        self.es.indices.create(index="system", ignore=400, body=settings)
+        self.es.indices.create(index=self.index+self.suffix, ignore=400, body=settings)
 
 
-    def push_data(self, index, data):
+    def push_data(self, data):
+        self.check_index()
         try:
-            self.es.index(index=index, body=data)
+            self.es.index(index=self.index+self.suffix, body=data)
         except Exception:
             print("ERROR: could not send data (connection issue)")

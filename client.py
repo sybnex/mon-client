@@ -14,6 +14,50 @@ from elastic import elastic
 pp = pprint.PrettyPrinter(indent=4)
 warnings.filterwarnings("ignore")
 
+def get_kube_data(name):
+    data = {}
+    try:
+        from kubernetes import client, config
+        config.load_kube_config()
+        version = client.VersionApi()
+        v1 = client.CoreV1Api()
+    except Exception as x:
+        print("ERROR: Could not connect to kubernetes: {0}".format(x))
+    else:
+        data.update({"k8s_name": name})
+        data.update({"k8s_version": version.get_code().git_version})
+
+        nodes = v1.list_node().items
+        cpu = 0; mem = 0 
+        for node in nodes:
+            try:
+                cpu += int(node.status.capacity["cpu"])
+                mem += int(node.status.capacity["memory"][:-2])
+            except Exception:
+                continue
+        
+        data.update({"k8s_cpu": cpu})
+        data.update({"k8s_memory": int(mem/1024/1024)})
+        data.update({"k8s_nodes": len(v1.list_node().items)})
+        data.update({"k8s_pods": len(v1.list_pod_for_all_namespaces().items)})
+        data.update({"k8s_pvcs": len(v1.list_persistent_volume_claim_for_all_namespaces().items)})
+        data.update({"k8s_secrets": len(v1.list_secret_for_all_namespaces().items)})
+        data.update({"k8s_services": len(v1.list_service_for_all_namespaces().items)})
+
+    pp.pprint(data)
+    return data
+
+def get_docker_data():
+    import docker
+    client = docker.from_env()
+    data = {}
+    data.update({"dck_version": client.version()["Components"][0]["Version"]})
+    data.update({"dck_containers": len(client.containers.list())})
+    data.update({"dck_images": len(client.images.list())})
+
+    pp.pprint(data)
+    return data
+
 def get_system_data():
     print("INFO: getting system data")
     data = {}
@@ -66,6 +110,12 @@ if __name__ == '__main__':
     if config["monitor"][0]["system"]:
         system_data = get_system_data()
 
+    if config["monitor"][0]["docker"]:
+        docker_data = get_docker_data()
+
+    if config["monitor"][0]["kube"]:
+        kube_data = get_kube_data("test")
+
     # configure backend and send data
     try:
         url = config["elastic"][0]["url"]
@@ -77,7 +127,12 @@ if __name__ == '__main__':
         if url and username and password:
             print("INFO: sending data to elastic")
             client = elastic(url, username, password)
-            client.push_data("system", system_data)
+            if config["monitor"][0]["system"]:
+                client.push_data(system_data)
+            if config["monitor"][0]["docker"]:
+                client.push_data(docker_data)
+            if config["monitor"][0]["kube"]:
+                client.push_data(docker_data)
         else:
             print("ERROR: credentials are missing values")
 
