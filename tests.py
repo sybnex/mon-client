@@ -16,7 +16,7 @@ if __name__ == '__main__':
         print("ERROR:", x)
         info = """Install missing packages by:
                sudo apt install python3-pip
-               pip3 install psutil pyyaml elasticsearch"""
+               pip3 install psutil pyyaml elasticsearch docker kubernetes"""
         print(info)
         sys.exit(1)
     else:

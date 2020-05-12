@@ -22,45 +22,37 @@ class elastic():
         except Exception as x:
             print("ERROR: could not connect to database:", x)
         else:
-            self.create_template()
             self.check_index()
 
 
     def check_index(self):
-        # needed for long termn runs
+        # needed for long term runs
         if not self.suffix == self.create_suffix():
             self.suffix = self.create_suffix()
             self.create_index()
+            self.update_index()
 
 
     def create_suffix(self):
         # create daily index
         now = datetime.datetime.utcnow()
-        year = str(now.year)[2:]
+        year = str(now.year)
         month = str(now.month).zfill(2)
         day = str(now.day).zfill(2)
         return "-%s%s%s" % (year, month, day)
 
 
-    def create_template(self):
-        body = {
-            "zeroreplicas" : {
-                "order" : 1,
-                "template" : "*",
-                "settings" : {
-                    "index" : { "number_of_replicas" : "0" }
-                },
-                "mappings" : { },
-                "aliases" : { }
-            }
+    def update_index(self):
+        settings = {
+            "settings": { "number_of_replicas": 0 }
         }
-        self.es.indices.put_template(name="default", body=body)
+        self.es.indices.put_settings(index=self.index+self.suffix, ignore=404, body=settings)
 
 
     def create_index(self):
         settings = {
             "settings": {
-                "number_of_shards": 1,
+                "number_of_shards": 1, 
                 "number_of_replicas": 0
             },
             "mappings": {
@@ -96,10 +88,9 @@ class elastic():
         }
         self.es.indices.create(index=self.index+self.suffix, ignore=400, body=settings)
 
-
     def push_data(self, data):
         self.check_index()
         try:
             self.es.index(index=self.index+self.suffix, body=data)
-        except Exception:
-            print("ERROR: could not send data (connection issue)")
+        except Exception as x:
+            print("ERROR: could not send data to index %s:" % (self.index+self.suffix), x)

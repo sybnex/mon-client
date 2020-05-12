@@ -44,18 +44,20 @@ def get_kube_data(name):
         data.update({"k8s_secrets": len(v1.list_secret_for_all_namespaces().items)})
         data.update({"k8s_services": len(v1.list_service_for_all_namespaces().items)})
 
-    pp.pprint(data)
     return data
 
 def get_docker_data():
-    import docker
-    client = docker.from_env()
     data = {}
-    data.update({"dck_version": client.version()["Components"][0]["Version"]})
-    data.update({"dck_containers": len(client.containers.list())})
-    data.update({"dck_images": len(client.images.list())})
+    try:
+        import docker
+        client = docker.from_env()
+    except Exception as x:
+        print("ERROR: Could not connect to docker daemon: {0}".format(x))
+    else:
+        data.update({"dck_version": client.version()["Components"][0]["Version"]})
+        data.update({"dck_containers": len(client.containers.list())})
+        data.update({"dck_images": len(client.images.list())})
 
-    pp.pprint(data)
     return data
 
 def get_system_data():
@@ -89,7 +91,6 @@ def get_system_data():
     # special case
     data.update({"work": "wfica" in (p.name() for p in psutil.process_iter())})
 
-    pp.pprint(data)
     return data
 
 def read_config():
@@ -103,36 +104,37 @@ def read_config():
         config.update({item: doc})
     return config
 
+def update_client():
+    print("INFO: updating repo")
+    os.system("git pull")
+
 if __name__ == '__main__':
     config = read_config()
     pp.pprint(config)
 
-    if config["monitor"][0]["system"]:
-        system_data = get_system_data()
-
-    if config["monitor"][0]["docker"]:
-        docker_data = get_docker_data()
-
-    if config["monitor"][0]["kube"]:
-        kube_data = get_kube_data("test")
-
     # configure backend and send data
     try:
-        url = config["elastic"][0]["url"]
-        username = config["elastic"][0]["user"] 
-        password = config["elastic"][0]["pass"]
+        url = config["elastic"]["url"]
+        username = config["elastic"]["user"] 
+        password = config["elastic"]["pass"]
     except Exception as x:
         print("ERROR: found no database credentials: {0}".format(x))
     else:
         if url and username and password:
-            print("INFO: sending data to elastic")
             client = elastic(url, username, password)
-            if config["monitor"][0]["system"]:
-                client.push_data(system_data)
-            if config["monitor"][0]["docker"]:
-                client.push_data(docker_data)
-            if config["monitor"][0]["kube"]:
-                client.push_data(docker_data)
+            data = {}
+            print("INFO: collecting data ...")
+            if config["monitor"]["system"]["enabled"]:
+                data.update(get_system_data())
+                if config["monitor"]["system"]["updater"]: update_client()
+            if config["monitor"]["docker"]["enabled"]:
+                data.update(get_docker_data())
+            if config["monitor"]["kube"]["enabled"]:
+                data.update(get_kube_data(config["monitor"]["kube"]["name"]))
+
+            print("INFO: sending data to elastic ...")
+            pp.pprint(data)
+            client.push_data(data)
         else:
             print("ERROR: credentials are missing values")
 

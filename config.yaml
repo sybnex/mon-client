@@ -1,10 +1,16 @@
 ---
 monitor:
-  - system: True
-    docker: True
-    kube: True
+  system: 
+    enabled: True
+    updater: True
+  docker: 
+    enabled: True
+  kube:
+    enabled: True
+    name: "julina"
+
 
 elastic:
-  - url: "https://elasticsearch:9200"
-    user: ""
-    pass: ""
+  url: "https://elasticsearch:9200"
+  user: ""
+  pass: ""
