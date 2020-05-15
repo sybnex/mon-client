@@ -91,6 +91,7 @@ class elastic():
     def push_data(self, data):
         self.check_index()
         try:
+            print("INFO: Using index: %s" % (self.index+self.suffix))
             self.es.index(index=self.index+self.suffix, body=data)
         except Exception as x:
             print("ERROR: could not send data to index %s:" % (self.index+self.suffix), x)

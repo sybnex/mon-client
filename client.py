@@ -18,12 +18,14 @@ def get_kube_data(name):
     data = {}
     try:
         from kubernetes import client, config
-        config.load_kube_config()
+        try: config.load_incluster_config()
+        except: config.load_kube_config()
         version = client.VersionApi()
         v1 = client.CoreV1Api()
     except Exception as x:
         print("ERROR: Could not connect to kubernetes: {0}".format(x))
     else:
+        data.update({"datetime": datetime.datetime.utcnow()})
         data.update({"k8s_name": name})
         data.update({"k8s_version": version.get_code().git_version})
 
@@ -41,7 +43,7 @@ def get_kube_data(name):
         data.update({"k8s_nodes": len(v1.list_node().items)})
         data.update({"k8s_pods": len(v1.list_pod_for_all_namespaces().items)})
         data.update({"k8s_pvcs": len(v1.list_persistent_volume_claim_for_all_namespaces().items)})
-        data.update({"k8s_secrets": len(v1.list_secret_for_all_namespaces().items)})
+        #data.update({"k8s_secrets": len(v1.list_secret_for_all_namespaces().items)})
         data.update({"k8s_services": len(v1.list_service_for_all_namespaces().items)})
 
     return data
@@ -68,7 +70,7 @@ def get_system_data():
     data.update({"os": platform.uname()[2]})
     data.update({"uptime": datetime.datetime.fromtimestamp(psutil.boot_time())})
     data.update({"cpu_prc": round(psutil.cpu_percent(interval=1), 2)})
-    data.update({"mem_prc": round(100 - psutil.virtual_memory()[2], 2)})
+    data.update({"mem_prc": round(psutil.virtual_memory()[2], 2)})
     data.update({"disc_prc": round(psutil.disk_usage('/')[3], 2)})
     data.update({"net_in": psutil.net_io_counters()[1]})
     data.update({"net_out": psutil.net_io_counters()[0]})
@@ -120,20 +122,21 @@ if __name__ == '__main__':
     except Exception as x:
         print("ERROR: found no database credentials: {0}".format(x))
     else:
+        data = {}
+        print("INFO: collecting data ...")
+        if config["monitor"]["system"]["enabled"]:
+            data.update(get_system_data())
+            if config["monitor"]["system"]["updater"]: update_client()
+        if config["monitor"]["docker"]["enabled"]:
+            data.update(get_docker_data())
+        if config["monitor"]["kube"]["enabled"]:
+            data.update(get_kube_data(config["monitor"]["kube"]["name"]))
+
+        print("INFO: sending data to elastic ...")
+        pp.pprint(data)
+
         if url and username and password:
             client = elastic(url, username, password)
-            data = {}
-            print("INFO: collecting data ...")
-            if config["monitor"]["system"]["enabled"]:
-                data.update(get_system_data())
-                if config["monitor"]["system"]["updater"]: update_client()
-            if config["monitor"]["docker"]["enabled"]:
-                data.update(get_docker_data())
-            if config["monitor"]["kube"]["enabled"]:
-                data.update(get_kube_data(config["monitor"]["kube"]["name"]))
-
-            print("INFO: sending data to elastic ...")
-            pp.pprint(data)
             client.push_data(data)
         else:
             print("ERROR: credentials are missing values")
