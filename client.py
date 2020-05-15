@@ -107,8 +107,9 @@ def read_config():
     return config
 
 def update_client():
-    print("INFO: updating repo")
-    os.system("git pull")
+    if datetime.datetime.utcnow().minute == 59:
+        print("INFO: updating repo")
+        os.system("git pull")
 
 if __name__ == '__main__':
     config = read_config()
