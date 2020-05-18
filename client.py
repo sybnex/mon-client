@@ -39,7 +39,7 @@ def get_kube_data(name):
                 continue
         
         data.update({"k8s_cpu": cpu})
-        data.update({"k8s_memory": int(mem/1024/1024)})
+        data.update({"k8s_memory": round(int(mem/1024/1024),0)})
         data.update({"k8s_nodes": len(v1.list_node().items)})
         data.update({"k8s_pods": len(v1.list_pod_for_all_namespaces().items)})
         data.update({"k8s_pvcs": len(v1.list_persistent_volume_claim_for_all_namespaces().items)})
